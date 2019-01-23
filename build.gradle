@@ -1,0 +1,18 @@
+apply plugin: 'java'
+apply plugin: 'antlr'
+apply plugin: 'idea'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    antlr "org.antlr:antlr4:4.7.2"
+    compile "org.antlr:antlr4-runtime:4.7.2"
+    testCompile 'junit:junit:4.12'
+}
+
+generateGrammarSource {
+    maxHeapSize = "64m"
+    arguments += ['-no-visitor', '-no-listener', '-package', 'input']
+}
