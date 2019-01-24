@@ -74,14 +74,7 @@ public class GrammarDescription {
 
     private Set<String> getNonTerminals(final List<ParserRule> parserRules) {
         return parserRules.stream()
-                .map(ParserRule::getAlternatives)
-                .flatMap(Collection::stream)
-                .filter(alternative -> alternative instanceof AtomAlternative)
-                .map(alternative -> (AtomAlternative) alternative)
-                .map(AtomAlternative::getAtoms)
-                .flatMap(Collection::stream)
-                .filter(ruleAtom -> !ruleAtom.isTerminal())
-                .map(RuleAtom::getName)
+                .map(ParserRule::getName)
                 .collect(Collectors.toSet());
     }
 

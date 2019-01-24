@@ -122,7 +122,7 @@ public class ParserGenerator {
     private void writeAtom(final RuleAtom atom, final TabbedWriter writer) throws IOException {
         if (atom instanceof Terminal) {
             writer.write(4, "if (curToken.type != " + tokensName + "." + atom.getName() + ") {\n");
-            writer.write(5, "throw new LexingException(\"Expected  + " + atom.getName() + " but found \" + curToken.type.name());\n");
+            writer.write(5, "throw new LexingException(\"Expected " + atom.getName() + " but found \" + curToken.type.name());\n");
             writer.write(4, "}\n");
             writer.write(4, "TokenData " + atom.getVar() + " = curToken.data;\n");
             writer.write(4, atom.getCode().orElse("") + "\n");

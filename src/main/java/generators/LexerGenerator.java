@@ -3,7 +3,9 @@ package generators;
 import input.GrammarDescription;
 import input.TokenRule;
 
+import java.io.Writer;
 import java.nio.file.Path;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -55,19 +57,23 @@ public class LexerGenerator {
         final String tokensName = name + "Tokens";
         try (final TabbedWriter writer = new TabbedWriter(output.resolve(name + "Lexer.java"))) {
             writer.writeHeader(grammar);
-            writer.write(0, "import input.TokenRule;\n");
-            writer.write(0, "import java.util.Scanner;\n");
-            writer.write(0, "import java.util.List;\n");
-            writer.write(0, "import java.util.ArrayList;\n");
+            writer.write(0, "import java.nio.file.Files;\n");
+            writer.write(0, "import java.util.Map;\n");
+            writer.write(0, "import java.util.HashMap;\n");
+            writer.write(0, "import java.util.stream.Collectors;\n");
+            writer.write(0, "import java.util.regex.Pattern;\n");
+            writer.write(0, "import java.util.regex.Matcher;\n");
+            writer.write(0, "import java.util.Arrays;\n");
             writer.write(0, "import java.io.IOException;\n");
             writer.write(0, "import runtime.TokenData;\n");
             writer.write(0, "import runtime.LexingException;\n");
             writer.write(0, "import java.nio.file.Path;\n\n");
-            writer.write(0, "public class " + name + "Lexer implements AutoCloseable {\n");
-            writer.write(1, "private final static Token _END_ = new Token(" + tokensName + "._END, new TokenData(\"\", \"\"));\n");
-            writer.write(1, "private final Scanner scanner;\n");
-            writer.write(1, "private final List<TokenRule> tokenRules;\n");
-            writer.write(1, "private final List<" + tokensName + "> tokenTypes;\n\n");
+            writer.write(0, "public class " + name + "Lexer {\n");
+            writer.write(1, "private final static Token _END_ = new Token(" + tokensName + "._END, new TokenData(\"_END\", \"\"));\n");
+            writer.write(1, "private final Pattern ignore;\n");
+            writer.write(1, "private final Matcher matcher;\n");
+            writer.write(1, "private String text;\n");
+            writer.write(1, "private final Map<" + tokensName + ", Pattern> tokens;\n\n");
             writer.write(1, "public " + name + "Lexer(final Path input) throws IOException {\n");
 
             final List<TokenRule> skips = grammar.getSkips();
@@ -84,32 +90,44 @@ public class LexerGenerator {
                     .map(regex -> "(" + regex + ")")
                     .collect(Collectors.joining("|"));
 
-            writer.write(2, "this.scanner = new Scanner(input).useDelimiter(\"" + delimiter + "\");\n");
-            writer.write(2, "this.tokenRules = new ArrayList<>();\n");
-            writer.write(2, "this.tokenTypes = new ArrayList<>();\n");
+            writer.write(2, "this.ignore = Pattern.compile(\"" + delimiter + "\");\n");
+            writer.write(2, "this.matcher = Pattern.compile(\"\").matcher(\"\");\n");
+            writer.write(2, "this.text = Files.newBufferedReader(input).lines().collect(Collectors.joining());\n");
+            writer.write(2, "this.tokens = new HashMap<>();\n");
             for (final TokenRule rule : tokens) {
-                writer.write(2, "this.tokenRules.add(new TokenRule(");
-                writer.write(0, "\"" + rule.getName() + "\", " + rule.getRegex() + "));\n");
-                writer.write(2, "this.tokenTypes.add(" + tokensName + "." + rule.getName() + ");\n");
+                writer.write(2, "this.tokens.put(" + tokensName + "." + rule.getName() + ", ");
+                writer.write(0, "Pattern.compile(" + rule.getRegex() + "));\n");
             }
             writer.write(1, "}\n\n");
 
-            writer.write(1, "public void close() throws Exception {\n");
-            writer.write(2, "scanner.close();\n");
-            writer.write(1, "}\n\n");
-
             writer.write(1, "public Token getNext() throws LexingException {\n");
-            writer.write(2, "if (tokenRules.stream().map(TokenRule::getRegex).noneMatch(scanner::hasNext)) {\n");
-            writer.write(3, "if (!scanner.hasNext()) {\n");
+            writer.write(2, "matcher.usePattern(ignore);\n");
+            writer.write(2, "matcher.reset(text);\n");
+            writer.write(2, "while (matcher.lookingAt()) {\n");
+            writer.write(3, "text = text.substring(matcher.end());\n");
+            writer.write(3, "matcher.reset(text);\n");
+            writer.write(2, "}\n");
+            writer.write(2, "final String curText = text;\n");
+            writer.write(2, "boolean matched = Arrays.stream(" + tokensName + ".values()).filter(type -> (type != " + tokensName + "._END)).map(tokens::get).anyMatch(regex -> {\n");
+            writer.write(3, "matcher.usePattern(regex);\n");
+            writer.write(3, "matcher.reset(curText);\n");
+            writer.write(3, "return matcher.lookingAt();\n");
+            writer.write(2, "});\n");
+            writer.write(2, "if (!matched) {\n");
+            writer.write(3, "if (text.isEmpty()) {\n");
             writer.write(4, "return _END_;\n");
             writer.write(3, "} else {\n");
-            writer.write(4, "throw new LexingException(\"Unmatched data in input: \\\"\" + scanner.next() + \"\\\"\");\n");
+            writer.write(4, "throw new LexingException(\"Unmatched data in input: \\\"\" + text + \"\\\"\");\n");
             writer.write(3, "}\n");
             writer.write(2, "} else {\n");
-            writer.write(3, "for (int i = 0; i < tokenRules.size(); ++i) {\n");
-            writer.write(4, "final TokenRule rule = tokenRules.get(i);\n");
-            writer.write(4, "if (scanner.hasNext(rule.getRegex())) {\n");
-            writer.write(5, "return new Token(tokenTypes.get(i), new TokenData(rule.getName(), scanner.next(rule.getRegex())));\n");
+            writer.write(3, "for (final " + tokensName + " type : " + tokensName + ".values()) {\n");
+            writer.write(4, "final Pattern regex = tokens.get(type);\n");
+            writer.write(4, "matcher.usePattern(regex);\n");
+            writer.write(4, "matcher.reset(text);\n");
+            writer.write(4, "if (matcher.lookingAt()) {\n");
+            writer.write(5, "final String curMatch = text.substring(0, matcher.end());\n");
+            writer.write(5, "text = text.substring(curMatch.length());\n");
+            writer.write(5, "return new Token(type, new TokenData(type.name(), curMatch));\n");
             writer.write(4, "}\n");
             writer.write(3, "}\n");
             writer.write(2, "}\n");

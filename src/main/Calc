@@ -1,0 +1,58 @@
+header {
+package calc;
+}
+
+tokens [
+    WS1 := "[ \t]+";
+    WS2 := "[\n\r]+";
+    NUMBER := "[1-9][0-9]*";
+    PLUS := "[+]";
+    MINUS := "[-]";
+    MULT := "[*]";
+    POW :=   "[\\^]";
+    LP :=   "[(]";
+    RP :=   "[)]";
+]
+
+ignore [
+    WS1 WS2
+]
+
+start = S;
+
+rules [
+    S() -> res : Integer
+        := head=T() tail=X(head) {res = tail;}
+        ;
+
+    X(acc : Integer) -> val : Integer
+        := p=PLUS head=T() {Integer nextAcc = acc + head;} tail=X(nextAcc) {val = tail;}
+        |  m=MINUS head=T() {Integer nextAcc = acc - head;} tail=X(nextAcc) {val = tail;}
+        |  EPS {val = acc;}
+        ;
+
+    T() -> val : Integer
+        := head=F() tail=Y(head) {val = tail;}
+        ;
+
+    Y(acc : Integer) -> val : Integer
+        := m=MULT head=F() {Integer nextAcc = acc * head;} tail=Y(nextAcc) {val = tail;}
+        |  EPS {val = acc;}
+        ;
+
+    F() -> val : Integer
+        := head=W() tail=Q() {val = (int) Math.pow(head.doubleValue(), tail.doubleValue());}
+        ;
+
+    Q() -> val : Integer
+        := p=POW head=W() tail=Q() {val = (int) Math.pow(head.doubleValue(), tail.doubleValue());}
+        |  EPS {val = 1;}
+        ;
+
+    W() -> val : Integer
+        := m=MINUS tail=W() {val = -1 * tail;}
+        |  num=NUMBER {val = new Integer(num.getText());}
+        |  l=LP mid=S() r=RP {val = mid;}
+        ;
+]
+
